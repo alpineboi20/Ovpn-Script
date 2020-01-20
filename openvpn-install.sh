@@ -18,6 +18,7 @@ function tunAvailable () {
 function checkOS () {
 	if [[ -e /etc/debian_version ]]; then
 		OS="debian"
+		# shellcheck disable=SC1091
 		source /etc/os-release
 
 		if [[ "$ID" == "debian" || "$ID" == "raspbian" ]]; then
@@ -51,10 +52,11 @@ function checkOS () {
 			fi
 		fi
 	elif [[ -e /etc/system-release ]]; then
+		# shellcheck disable=SC1091
 		source /etc/os-release
 		if [[ "$ID" = "centos" ]]; then
 			OS="centos"
-			if [[ ! $VERSION_ID == "7" ]]; then
+			if [[ ! $VERSION_ID =~ (7|8) ]]; then
 				echo "⚠️ Your version of CentOS is not supported."
 				echo ""
 				echo "The script only support CentOS 7."
@@ -208,7 +210,7 @@ function installQuestions () {
 	if [[ $APPROVE_IP =~ n ]]; then
 		read -rp "IP address: " -e -i "$IP" IP
 	fi
-	# If $IP is a private IP address, the server must be behind NAT
+	# If $IP is a private IP address, the server must be behind NAT
 	if echo "$IP" | grep -qE '^(10\.|172\.1[6789]\.|172\.2[0-9]\.|172\.3[01]\.|192\.168)'; then
 		echo ""
 		echo "It seems this server is behind NAT. What is its public IPv4 address or hostname?"
@@ -621,7 +623,7 @@ function installOpenVPN () {
 		apt-get install -y openvpn iptables openssl wget ca-certificates curl
 	elif [[ "$OS" = 'centos' ]]; then
 		yum install -y epel-release
-		yum install -y openvpn iptables openssl wget ca-certificates curl
+		yum install -y openvpn iptables openssl wget ca-certificates curl tar
 	elif [[ "$OS" = 'amzn' ]]; then
 		amazon-linux-extras install -y epel
 		yum install -y openvpn iptables openssl wget ca-certificates curl
@@ -652,7 +654,7 @@ function installOpenVPN () {
 	chown -R root:root /etc/openvpn/easy-rsa/
 	rm -f ~/EasyRSA-unix-v${version}.tgz
 
-	cd /etc/openvpn/easy-rsa/
+	cd /etc/openvpn/easy-rsa/ || return
 	case $CERT_TYPE in
 		1)
 			echo "set_var EASYRSA_ALGO ec" > vars
@@ -668,12 +670,13 @@ function installOpenVPN () {
 	SERVER_NAME="server_$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
 	echo "set_var EASYRSA_REQ_CN $SERVER_CN" >> vars
 
-	# Workaround to remove unharmful error until easy-rsa 3.0.7
-	# https://github.com/OpenVPN/easy-rsa/issues/261
-	sed -i 's/^RANDFILE/#RANDFILE/g' pki/openssl-easyrsa.cnf
-
 	# Create the PKI, set up the CA, the DH params and the server certificate
 	./easyrsa init-pki
+
+        # Workaround to remove unharmful error until easy-rsa 3.0.7
+        # https://github.com/OpenVPN/easy-rsa/issues/261
+        sed -i 's/^RANDFILE/#RANDFILE/g' pki/openssl-easyrsa.cnf
+
 	./easyrsa --batch build-ca nopass
 
 	if [[ $DH_TYPE == "2" ]]; then
@@ -825,7 +828,7 @@ tls-server
 tls-version-min 1.2
 tls-cipher $CC_CIPHER
 reneg-sec 0
-max-clients 15
+#max-clients 15
 duplicate-cn
 log /dev/null
 status /dev/null
@@ -845,14 +848,14 @@ verb 0" >> /etc/openvpn/server.conf
 	# If SELinux is enabled and a custom port was selected, we need this
 	if hash sestatus 2>/dev/null; then
 		if sestatus | grep "Current mode" | grep -qs "enforcing"; then
-			if [[ "$PORT" != '64649' ]]; then
+			if [[ "$PORT" != '1194' ]]; then
 				semanage port -a -t openvpn_port_t -p "$PROTOCOL" "$PORT"
 			fi
 		fi
 	fi
 
 	# Finally, restart and enable OpenVPN
-	if [[ "$OS" = 'arch' || "$OS" = 'fedora' ]]; then
+	if [[ "$OS" = 'arch' || "$OS" = 'fedora' || "$OS" = 'centos' ]]; then
 		# Don't modify package-provided service
 		cp /usr/lib/systemd/system/openvpn-server@.service /etc/systemd/system/openvpn-server@.service
 
@@ -1090,7 +1093,7 @@ function revokeClient () {
 	fi
 
 	CLIENT=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | sed -n "$CLIENTNUMBER"p)
-	cd /etc/openvpn/easy-rsa/
+	cd /etc/openvpn/easy-rsa/ || return
 	./easyrsa --batch revoke "$CLIENT"
 	EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
 	# Cleanup
@@ -1146,13 +1149,14 @@ function removeUnbound () {
 
 function removeOpenVPN () {
 	echo ""
+	# shellcheck disable=SC2034
 	read -rp "Do you really want to remove OpenVPN? [y/n]: " -e -i n REMOVE
 	if [[ "$REMOVE" = 'y' ]]; then
 		# Get OpenVPN port from the configuration
 		PORT=$(grep '^port ' /etc/openvpn/server.conf | cut -d " " -f 2)
 
 		# Stop OpenVPN
-		if [[ "$OS" =~ (fedora|arch) ]]; then
+		if [[ "$OS" =~ (fedora|arch|centos) ]]; then
 			systemctl disable openvpn-server@server
 			systemctl stop openvpn-server@server
 			# Remove customised service
@@ -1179,7 +1183,7 @@ function removeOpenVPN () {
 		# SELinux
 		if hash sestatus 2>/dev/null; then
 			if sestatus | grep "Current mode" | grep -qs "enforcing"; then
-				if [[ "$PORT" != '64649' ]]; then
+				if [[ "$PORT" != '1194' ]]; then
 					semanage port -d -t openvpn_port_t -p udp "$PORT"
 				fi
 			fi
