@@ -720,6 +720,9 @@ user nobody
 group $NOGROUP
 persist-key
 persist-tun
+tun-mtu 1500
+tun-mtu-extra 32
+mssfix 1450
 keepalive 10 30
 topology subnet
 server 10.8.0.0 255.255.255.0
@@ -968,6 +971,9 @@ resolv-retry infinite
 nobind
 persist-key
 persist-tun
+tun-mtu 1500
+tun-mtu-extra 32
+mssfix 1450
 remote-cert-tls server
 verify-x509-name $SERVER_NAME name
 auth $HMAC_ALG
