@@ -1,4 +1,4 @@
-# ovpn-script
+# Ovpn-script
 This is for testing, do not use.
 A modifed options version of angristan's openvpn script.
 Please use original authors script, as some options in this scipt may be unsuitable.
