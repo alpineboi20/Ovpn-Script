@@ -243,7 +243,7 @@ function installQuestions () {
 	done
 	echo ""
 	echo "What port do you want OpenVPN to listen to?"
-	echo "   1) Default: 64649"
+	echo "   1) Default: 8080"
 	echo "   2) Custom"
 	echo "   3) Random [49152-65535]"
 	until [[ "$PORT_CHOICE" =~ ^[1-3]$ ]]; do
@@ -251,11 +251,11 @@ function installQuestions () {
 	done
 	case $PORT_CHOICE in
 		1)
-			PORT="64649"
+			PORT="8080"
 		;;
 		2)
 			until [[ "$PORT" =~ ^[0-9]+$ ]] && [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ]; do
-				read -rp "Custom port [1-65535]: " -e -i 64649 PORT
+				read -rp "Custom port [1-65535]: " -e -i 8080 PORT
 			done
 		;;
 		3)
@@ -366,7 +366,7 @@ function installQuestions () {
 		CC_CIPHER="TLS-ECDHE-ECDSA-WITH-AES-128-GCM-SHA256"
 		DH_TYPE="1" # ECDH
 		DH_CURVE="prime256v1"
-		HMAC_ALG="SHA256"
+		HMAC_ALG="SHA1"
 		TLS_SIG="1" # tls-crypt
 	else
 		echo ""
@@ -462,7 +462,7 @@ function installQuestions () {
 				done
 				case $CC_CIPHER_CHOICE in
 					1)
-						CC_CIPHER="TLS-ECDHE-ECDSA-WITH-AES-128-GCM-SHA256"
+						CC_CIPHER="TLS-ECDHE-ECDSA-WITH-AES-128-GCM-SH256"
 					;;
 					2)
 						CC_CIPHER="TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384"
@@ -724,6 +724,10 @@ tun-mtu 1500
 tun-mtu-extra 32
 mssfix 1450
 keepalive 10 30
+reneg-sec 0
+duplicate-cn
+sndbuf 524288
+rcvbuf 524288
 topology subnet
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt" >> /etc/openvpn/server.conf
@@ -830,9 +834,6 @@ ncp-ciphers $CIPHER
 tls-server
 tls-version-min 1.2
 tls-cipher $CC_CIPHER
-reneg-sec 0
-#max-clients 15
-duplicate-cn
 log /dev/null
 status /dev/null
 verb 0" >> /etc/openvpn/server.conf
@@ -851,7 +852,7 @@ verb 0" >> /etc/openvpn/server.conf
 	# If SELinux is enabled and a custom port was selected, we need this
 	if hash sestatus 2>/dev/null; then
 		if sestatus | grep "Current mode" | grep -qs "enforcing"; then
-			if [[ "$PORT" != '1194' ]]; then
+			if [[ "$PORT" != '8080' ]]; then
 				semanage port -a -t openvpn_port_t -p "$PROTOCOL" "$PORT"
 			fi
 		fi
@@ -971,9 +972,6 @@ resolv-retry infinite
 nobind
 persist-key
 persist-tun
-tun-mtu 1500
-tun-mtu-extra 32
-mssfix 1450
 remote-cert-tls server
 verify-x509-name $SERVER_NAME name
 auth $HMAC_ALG
@@ -982,11 +980,16 @@ cipher $CIPHER
 tls-client
 tls-version-min 1.2
 tls-cipher $CC_CIPHER
-reneg-sec 0
 sndbuf 524288
 rcvbuf 524288
-#setenv opt block-outside-dns # Fix DNS Leaks Windows Only
-#fast-io # Lower CPU Usage Android Only
+tun-mtu 1500
+tun-mtu-extra 32
+mssfix 1450
+reneg-sec 0
+#ignore-unknown-option block-outside-dns
+#block-outside-dns
+ignore-unknown-option fast-io
+fast-io
 verb 3" >> /etc/openvpn/client-template.txt
 
 if [[ $COMPRESSION_ENABLED == "y"  ]]; then
