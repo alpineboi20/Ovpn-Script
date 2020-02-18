@@ -103,8 +103,8 @@ function installUnbound () {
 			apt-get install -y unbound
 
 			# Configuration
-			echo 'interface: 10.8.0.1
-access-control: 10.8.0.1/24 allow
+			echo 'interface: 10.9.0.1
+access-control: 10.9.0.1/24 allow
 hide-identity: yes
 hide-version: yes
 use-caps-for-id: yes
@@ -114,8 +114,8 @@ prefetch: yes' >> /etc/unbound/unbound.conf
 			yum install -y unbound
 
 			# Configuration
-			sed -i 's|# interface: 0.0.0.0$|interface: 10.8.0.1|' /etc/unbound/unbound.conf
-			sed -i 's|# access-control: 127.0.0.0/8 allow|access-control: 10.8.0.1/24 allow|' /etc/unbound/unbound.conf
+			sed -i 's|# interface: 0.0.0.0$|interface: 10.9.0.1|' /etc/unbound/unbound.conf
+			sed -i 's|# access-control: 127.0.0.0/8 allow|access-control: 10.9.0.1/24 allow|' /etc/unbound/unbound.conf
 			sed -i 's|# hide-identity: no|hide-identity: yes|' /etc/unbound/unbound.conf
 			sed -i 's|# hide-version: no|hide-version: yes|' /etc/unbound/unbound.conf
 			sed -i 's|use-caps-for-id: no|use-caps-for-id: yes|' /etc/unbound/unbound.conf
@@ -124,8 +124,8 @@ prefetch: yes' >> /etc/unbound/unbound.conf
 			dnf install -y unbound
 
 			# Configuration
-			sed -i 's|# interface: 0.0.0.0$|interface: 10.8.0.1|' /etc/unbound/unbound.conf
-			sed -i 's|# access-control: 127.0.0.0/8 allow|access-control: 10.8.0.1/24 allow|' /etc/unbound/unbound.conf
+			sed -i 's|# interface: 0.0.0.0$|interface: 10.9.0.1|' /etc/unbound/unbound.conf
+			sed -i 's|# access-control: 127.0.0.0/8 allow|access-control: 10.9.0.1/24 allow|' /etc/unbound/unbound.conf
 			sed -i 's|# hide-identity: no|hide-identity: yes|' /etc/unbound/unbound.conf
 			sed -i 's|# hide-version: no|hide-version: yes|' /etc/unbound/unbound.conf
 			sed -i 's|# use-caps-for-id: no|use-caps-for-id: yes|' /etc/unbound/unbound.conf
@@ -145,8 +145,8 @@ prefetch: yes' >> /etc/unbound/unbound.conf
 	directory: "/etc/unbound"
 	trust-anchor-file: trusted-key.key
 	root-hints: root.hints
-	interface: 10.8.0.1
-	access-control: 10.8.0.1/24 allow
+	interface: 10.9.0.1
+	access-control: 10.9.0.1/24 allow
 	port: 53
 	num-threads: 2
 	use-caps-for-id: yes
@@ -173,8 +173,8 @@ private-address: ::ffff:0:0/96" >> /etc/unbound/unbound.conf
 
 		# Add Unbound 'server' for the OpenVPN subnet
 		echo 'server:
-interface: 10.8.0.1
-access-control: 10.8.0.1/24 allow
+interface: 10.9.0.1
+access-control: 10.9.0.1/24 allow
 hide-identity: yes
 hide-version: yes
 use-caps-for-id: yes
@@ -243,7 +243,7 @@ function installQuestions () {
 	done
 	echo ""
 	echo "What port do you want OpenVPN to listen to?"
-	echo "   1) Default: 8080"
+	echo "   1) Default: 64649"
 	echo "   2) Custom"
 	echo "   3) Random [49152-65535]"
 	until [[ "$PORT_CHOICE" =~ ^[1-3]$ ]]; do
@@ -251,11 +251,11 @@ function installQuestions () {
 	done
 	case $PORT_CHOICE in
 		1)
-			PORT="8080"
+			PORT="64649"
 		;;
 		2)
 			until [[ "$PORT" =~ ^[0-9]+$ ]] && [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ]; do
-				read -rp "Custom port [1-65535]: " -e -i 8080 PORT
+				read -rp "Custom port [1-65535]: " -e -i 64649 PORT
 			done
 		;;
 		3)
@@ -295,7 +295,7 @@ function installQuestions () {
 	echo "   11) AdGuard DNS (Russia)"
 	echo "   12) Custom"
 	until [[ "$DNS" =~ ^[0-9]+$ ]] && [ "$DNS" -ge 1 ] && [ "$DNS" -le 12 ]; do
-		read -rp "DNS [1-12]: " -e -i 2 DNS
+		read -rp "DNS [1-12]: " -e -i 3 DNS
 			if [[ $DNS == 2 ]] && [[ -e /etc/unbound/unbound.conf ]]; then
 				echo ""
 				echo "Unbound is already installed."
@@ -552,10 +552,10 @@ function installQuestions () {
 		done
 		case $HMAC_ALG_CHOICE in
 			1)
-				HMAC_ALG="SHA256"
+				HMAC_ALG="SHA1"
 			;;
 			2)
-				HMAC_ALG="SHA384"
+				HMAC_ALG="SHA256"
 			;;
 			3)
 				HMAC_ALG="SHA512"
@@ -728,8 +728,9 @@ reneg-sec 0
 duplicate-cn
 sndbuf 524288
 rcvbuf 524288
+#tcp-nodelay  #Uncomment For TCP Connections
 topology subnet
-server 10.8.0.0 255.255.255.0
+server 10.9.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt" >> /etc/openvpn/server.conf
 
 	# DNS resolvers
@@ -852,7 +853,7 @@ verb 0" >> /etc/openvpn/server.conf
 	# If SELinux is enabled and a custom port was selected, we need this
 	if hash sestatus 2>/dev/null; then
 		if sestatus | grep "Current mode" | grep -qs "enforcing"; then
-			if [[ "$PORT" != '8080' ]]; then
+			if [[ "$PORT" != '64649' ]]; then
 				semanage port -a -t openvpn_port_t -p "$PROTOCOL" "$PORT"
 			fi
 		fi
@@ -903,7 +904,7 @@ verb 0" >> /etc/openvpn/server.conf
 
 	# Script to add rules
 	echo "#!/bin/sh
-iptables -t nat -I POSTROUTING 1 -s 10.8.0.0/24 -o $NIC -j MASQUERADE
+iptables -t nat -I POSTROUTING 1 -s 10.9.0.0/24 -o $NIC -j MASQUERADE
 iptables -I INPUT 1 -i tun0 -j ACCEPT
 iptables -I FORWARD 1 -i $NIC -o tun0 -j ACCEPT
 iptables -I FORWARD 1 -i tun0 -o $NIC -j ACCEPT
@@ -918,7 +919,7 @@ ip6tables -I FORWARD 1 -i tun0 -o $NIC -j ACCEPT" >> /etc/iptables/add-openvpn-r
 
 	# Script to remove rules
 	echo "#!/bin/sh
-iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o $NIC -j MASQUERADE
+iptables -t nat -D POSTROUTING -s 10.9.0.0/24 -o $NIC -j MASQUERADE
 iptables -D INPUT -i tun0 -j ACCEPT
 iptables -D FORWARD -i $NIC -o tun0 -j ACCEPT
 iptables -D FORWARD -i tun0 -o $NIC -j ACCEPT
